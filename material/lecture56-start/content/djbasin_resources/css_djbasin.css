@@ -1,0 +1,59 @@
+            #mapdiv {
+                height:100vh;
+            }
+
+            .col-xs-12, .col-xs-6, .col-xs-4 {
+                padding:3px;
+            }
+
+            #divProject {
+                background-color: beige;
+            }
+            
+            #divBUOWL {
+                background-color: #ffffb3;
+            }
+            
+            #divEagle {
+                background-color: #ccffb3;
+            }
+            
+            #divRaptor {
+                background-color: #e6ffff;
+            }
+            
+            .errorMsg {
+                padding:0;
+                text-align:center;
+                background-color:darksalmon;
+            }
+            
+            .btnSurveys {
+                display:none;    
+            }   
+            
+            form {
+                display:none;
+            }
+            /* The Modal (background) */
+            .modal {
+                z-index: 2001; /* Sit on top */
+                width: 100%; /* Full width */
+                height: 100%; /* Full height */
+                display: none; /* Hidden by default */
+                background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            }
+
+            /* Modal Content */
+            .modal-content {
+                color: saddlebrown;
+                padding: 20px;
+                margin-top: 5%;
+                background-color:antiquewhite;
+                height:80%;
+                overflow-y:auto;
+            }
+            
+            .tblHeader {
+                background-color: wheat
+            }

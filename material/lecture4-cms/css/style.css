@@ -1,0 +1,48 @@
+body {
+    padding-top: 90px;
+    color:saddlebrown;
+    background-color: antiquewhite;
+}
+
+a:visited {
+    color:saddlebrown;
+}
+a:link {
+    color:darkgoldenrod;
+}
+a:hover {
+    color:brown;
+}
+.btn-custom {
+    color:saddlebrown;
+    background-color: antiquewhite;
+}
+nav a:visited {
+    color:beige;
+}
+nav a:link {
+    color:aliceblue;
+}
+nav a:hover {
+    color:saddlebrown;
+}
+
+.navbar {
+    color:antiquewhite;
+    background-color: saddlebrown;
+}
+
+.tbl-group-head {
+    background-color: wheat;
+}
+
+.nav-tabs > li.active > a, .nav-tabs > li.active > a:hover, .nav-tabs > li.active > a:focus {
+    color:saddlebrown;
+    background-color: wheat;
+}
+
+.nav-tabs > li > a {
+    font-size: 16px;
+    font-weight: bold;
+    border: 1px solid #ddd;
+}
