@@ -41,7 +41,6 @@ if (logged_in()) {
   <script src="src/plugins/leaflet.markercluster.js"></script>
   <script src="src/plugins/leaflet-legend.js"></script>
   <script src="src/jquery-ui.min.js"></script>
-  <script src="src/turf.min.js"></script>
 
   <style>
   #mapdiv {
@@ -198,12 +197,12 @@ if (logged_in()) {
         <div class="col-xs-4">
           <input type='checkbox' name='fltProject' value='Pipeline' checked>Pipelines<br>
           <input type='checkbox' name='fltProject' value='Road' checked>Access Roads
-          <button id="btnProjectFilterAll" class="btn btn-primary btn-block">Check All</button>
+          <button id="btnProjectCheckAll" class="btn btn-primary btn-block">Check All</button>
         </div>
         <div class="col-xs-4">
           <input type='checkbox' name='fltProject' value='Electric' checked>Electric Lines<br>
           <input type='checkbox' name='fltProject' value='Extraction' checked>Extractions
-          <button id="btnProjectFilterNone" class="btn btn-primary btn-block">Uncheck All</button>
+          <button id="btnProjectCheckNone" class="btn btn-primary btn-block">Uncheck All</button>
         </div>
         <div class="col-xs-4">
           <input type='checkbox' name='fltProject' value='Flowline' checked>Flowlines<br>
@@ -332,7 +331,7 @@ if (logged_in()) {
   var arRaptorIDs = [];
 
   //limit query FOR TEST PURPOSE to speed up the loading process on the canvas
-  var queryLimitNr=2000;
+  var queryLimitNr=2000; //var queryLimitNr=""; //Do not limit any value
 
   $(document).ready(function(){
 
@@ -478,50 +477,10 @@ if (logged_in()) {
   }
 
   function processClientLinears(json, lyr) {
+    // Process each feature of the Linear Project
     var att = json.properties;
     lyr.bindTooltip("<h4>Linear Project: "+att.project+"</h4>Type: "+att.type+"<br>ROW Width: "+att.row_width+"<br>Length: "+returnMultiLength(lyr.getLatLngs()).toFixed(0));
     arProjectIDs.push(att.project.toString());
-    var jsnBuffer = turf.buffer(json, att.row_width/1000, {units:'kilometers'});
-    //If the style here is changed it also should be changed in the legend
-    var lyrBuffer = L.geoJSON(jsnBuffer, {style:{color:'gray', dashArray:'5,5'}});
-    lyrClientLinesBuffer.addLayer(lyrBuffer);
-    console.log("Buffer for lyrClientLines made on the client, using turf.js!");
-  }
-
-  function filterClientLines(json) {
-    var arProjectFilter=[];
-    $("input[name=fltProject]").each(function(){
-      if (this.checked) {
-        arProjectFilter.push(this.value);
-      }
-    });
-    var att = json.properties;
-    switch (att.type) {
-      case "Pipeline":
-      return (arProjectFilter.indexOf('Pipeline')>=0);
-      break;
-      case "Flowline":
-      return (arProjectFilter.indexOf('Flowline')>=0);
-      break;
-      case "Flowline, est.":
-      return (arProjectFilter.indexOf('Flowline')>=0);
-      break;
-      case "Electric Line":
-      return (arProjectFilter.indexOf('Electric')>=0);
-      break;
-      case "Access Road - Confirmed":
-      return (arProjectFilter.indexOf('Road')>=0);
-      break;
-      case "Access Road - Estimated":
-      return (arProjectFilter.indexOf('Road')>=0);
-      break;
-      case "Extraction":
-      return (arProjectFilter.indexOf('Extraction')>=0);
-      break;
-      default:
-      return (arProjectFilter.indexOf('Other')>=0);
-      break;
-    }
   }
 
   $("#txtFindProject").on('keyup paste', function(){
@@ -554,11 +513,11 @@ if (logged_in()) {
     $("#divProjectData").toggle();
   });
 
-  $("#btnProjectFilterAll").click(function(){
+  $("#btnProjectCheckAll").click(function(){
     $("input[name=fltProject]").prop('checked', true);
   });
 
-  $("#btnProjectFilterNone").click(function(){
+  $("#btnProjectCheckNone").click(function(){
     $("input[name=fltProject]").prop('checked', false);
   });
 
@@ -568,14 +527,59 @@ if (logged_in()) {
   });
 
   $("#btnProjectFilter").click(function(){
-    refreshLinears();
-  });
+       var arTypes=[];
+       var cntChecks=0;
+       $("input[name=fltProject]").each(function(){
+           if (this.checked) {
+               if (this.value=='Pipeline') {
+                   arTypes.push("'Pipeline'");
+                   cntChecks++;
+               }
+               if (this.value=='Flowline') {
+                   arTypes.push("'Flowline'");
+                   arTypes.push("'Flowline, est.'");
+                   cntChecks++;
+               }
+               if (this.value=='Electric') {
+                   arTypes.push("'Electric Line'");
+                   cntChecks++;
+               }
+               if (this.value=='Road') {
+                   arTypes.push("'Access Road - Confirmed'");
+                   arTypes.push("'Access Road - Estimated'");
+                   cntChecks++;
+               }
+               if (this.value=='Extraction') {
+                   arTypes.push("'Extraction'");
+                   arTypes.push("'Delayed-Extraction'");
+                   cntChecks++;
+               }
+               if (this.value=='Other') {
+                   arTypes.push("'Other'");
+                   arTypes.push("'Underground Pipe'");
+                   cntChecks++;
+               }
+           }
+       });
+       if (cntChecks==0) {
+           //the where clause receives "1=2", which is false and will return no values
+           refreshLinears("1=2");
+       } else if (cntChecks==6) {
+           refreshLinears();
+       } else {
+          alert("type IN ("+arTypes.toString()+")");
+           refreshLinears("type IN ("+arTypes.toString()+")");
+       }
+   });
 
-  function refreshLinears() {
-    //The BUFFER for this layer is not made on the server. As an example the buffer for the BUOWL is made on the server.
-    //It was not tested on the web to check each one is faster. That's why there's both layers using different methods to be tested
+  function refreshLinears(whr) {
+    if(whr){
+      var objData = {tbl:'dj_linear', flds:"id, type, row_width, project", where:whr, limit:queryLimitNr}
+    }else {
+      var objData = {tbl:'dj_linear', flds:"id, type, row_width, project", limit:queryLimitNr}
+    }
     $.ajax({url:'load_data.php',
-    data: {tbl:'dj_linear', flds:"id, type, row_width, project", limit:queryLimitNr},
+    data: objData,
     type: 'POST',
     success: function(response){
       //catching the ERROR (if any)
@@ -595,7 +599,7 @@ if (logged_in()) {
         }
         //buffers will be created in the processClientLinears()
         lyrClientLinesBuffer = L.featureGroup();
-        lyrClientLines = L.geoJSON(jsnLinears, {style:styleClientLinears, onEachFeature:processClientLinears, filter:filterClientLines}).addTo(mymap);
+        lyrClientLines = L.geoJSON(jsnLinears, {style:styleClientLinears, onEachFeature:processClientLinears}).addTo(mymap);
 
         //Adds the Layer to the control Layer panel, specifying its name
         //If the name specified here is changed. It also should be changed the name of the legend div
@@ -609,8 +613,7 @@ if (logged_in()) {
           source:arProjectIDs
         });
         //Add the layers to the map
-        lyrClientLinesBuffer.addTo(mymap);
-        lyrClientLines.bringToFront();
+        refreshLinearBuffers(whr);
       }
     },
     //
@@ -618,6 +621,36 @@ if (logged_in()) {
       alert("ERROR: "+error);
     }
   });
+}
+
+function refreshLinearBuffers(whr) {
+    if (whr) {
+        var objData={tbl:'dj_linear', flds:"id, type, row_width, project", where:whr, distance:"row_width", limit:queryLimitNr}
+    } else {
+        var objData={tbl:'dj_linear', flds:"id, type, row_width, project", distance:"row_width", limit:queryLimitNr}
+    }
+    $.ajax({url:'load_data.php',
+        data: objData,
+        type: 'POST',
+        success: function(response){
+            if (response.substring(0,5)=="ERROR"){
+                alert(response);
+            } else {
+                jsnLinearBuffers = JSON.parse(response);
+                console.log("refreshLinearBuffers Response:");
+                console.log(jsnLinearBuffers);
+                if (lyrClientLinesBuffer) {
+                    lyrClientLinesBuffer.remove();
+                }
+                lyrClientLinesBuffer = L.geoJSON(jsnLinearBuffers, {style:{color:'grey', dashArray:'5,5', fillOpacity:0}}).addTo(mymap);
+                console.log("Buffer for lyrClientLines made on the server, using ST_Buffer!");
+                lyrClientLines.bringToFront();
+            }
+        },
+        error: function(xhr, status, error){
+         alert("ERROR: "+error);
+        }
+    });
 }
 
 //************************ BUOWL Functions
@@ -734,9 +767,6 @@ function refreshBUOWL(whr) {
         //Create the buffer for this layer, in the server side and add it to the map
         //Pass the same 'where' clause to the buffer in order to filter it
         refreshBUOWLbuffer(whr);
-        //From turf.js
-        // jsnBUOWLbuffer = turf.buffer(lyrBUOWL.toGeoJSON(), 0.3, {units:'kilometers'});
-        // lyrBUOWLbuffer = L.geoJSON(jsnBUOWLbuffer, {style:{color:'yellow', dashArray:'5,5', fillOpacity:0}}).addTo(mymap);
 
         //Bring the BUOWL layer to front in order to the Popup to work
         lyrBUOWL.bringToFront();
@@ -754,8 +784,6 @@ function refreshBUOWLbuffer(whr) {
   }else{
     var objData = {tbl:'dj_buowl', flds:"id, habitat_id, habitat, recentstatus, hist_occup", distance:300, limit:queryLimitNr};
   }
-  //The BUFFER for this layer is made on the server. As an example the buffer for the Linears Project is made on the client, using turf.js.
-  //It was not tested on the web, to check each one is faster. That's why there's both layers using different methods to be tested.
   $.ajax({url:'load_data.php',
   data: objData,
   type: 'POST',
