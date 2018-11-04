@@ -73,6 +73,7 @@ if (logged_in()) {
     background-color:darksalmon;
   }
 
+/* By Default do not dysplay the btnSurveys in order to be only appear when a project is searched */
   .btnSurveys {
        display:none;
    }
@@ -213,6 +214,7 @@ if (logged_in()) {
         </div>
       </div>
       <div class="" id="divProjectData"></div>
+      <div class="" id="divProjectAffected"></div>
     </div>
     <div id="divBUOWL" class="col-xs-12">
       <div id="divBUOWLLabel" class="text-center col-xs-12">
@@ -237,8 +239,12 @@ if (logged_in()) {
         <div class="col-xs-4">
           <input type='radio' name='fltBUOWL' value='Undetermined'>Undetermined
         </div>
+        <!-- DIV where we put the attribute data once we find the BUOWL-->
+        <div class="" id="divBUOWLData"></div>
+        <div class="" id="divBUOWLaffected"></div>
       </div>
-      <div class="" id="divBUOWLData"></div>
+      <!-- btn-block makes the button goes the whole way across the available space, btn-primary makes it bluw and btn makes it a nice pretty looking button with round corners and hover effect -->
+      <button id="btnBUOWLsurveys" class="btnSurveys btn btn-primary btn-block">Show Surveys</button>
     </div>
     <div id="divEagle" class="col-xs-12">
       <div id="divEagleLabel" class="text-center col-xs-12">
@@ -263,8 +269,10 @@ if (logged_in()) {
         <div class="col-xs-4">
           <input type='radio' name='fltEagle' value='INACTIVE LOCATION'>Inactive
         </div>
+        <div class="" id="divEagleData"></div>
+        <div class="" id="divEagleAffected"></div>
       </div>
-      <div class="" id="divEagleData"></div>
+      <button id="btnEagleSurveys" class="btnSurveys btn btn-primary btn-block">Show Surveys</button>
     </div>
     <div id="divRaptor" class="col-xs-12">
       <div id="divRaptorLabel" class="text-center col-xs-12">
@@ -292,8 +300,10 @@ if (logged_in()) {
         <div class="col-xs-3">
           <input type='radio' name='fltRaptor' value='FLEDGED NEST'>Fledged
         </div>
+        <div class="" id="divRaptorData"></div>
+        <div class="" id="divRaptorAffected"></div>
       </div>
-      <div class="" id="divRaptorData"></div>
+      <button id="btnRaptorSurveys" class="btnSurveys btn btn-primary btn-block">Show Surveys</button>
     </div>
   </div>
   <div id="mapdiv" class="col-md-12"></div>
@@ -407,6 +417,7 @@ if (logged_in()) {
     mymap.on('click', function(){
       //Makes the searched project (if any) doesn't be outstanding anymore
       //alert( "Map clicked" );
+      lyrSearch.remove();
     });
 
     mymap.on('overlayadd', function(e){
@@ -519,11 +530,21 @@ if (logged_in()) {
         lyrSearch = L.geoJSON(lyr.toGeoJSON(), {style:{color:'red', weight:10, opacity:0.5}}).addTo(mymap);
         mymap.fitBounds(lyr.getBounds().pad(1));
         var att = lyr.feature.properties;
-        $("#divProjectData").html("<h4 class='text-center'>Attributes</h4><h5>Type: "+att.type+"</h5><h5>ROW width: "+att.row_width+ "m </h5>");
+        $("#divProjectData").html("<h4 class='text-center'>Attributes</h4><h5><b>Type:</b> "+att.type+"</h5><h5><b>ROW width:</b> "+att.row_width+ "m </h5>");
         $("#divProjectError").html("");
 
-        fgpDrawnItems.clearLayers();
-        fgpDrawnItems.addLayer(lyr);
+        $.ajax({
+          //Check for each if the project has any Constraint regarding: Burrowing Owls Habitat, Raptor and Eagles nests
+            url:'djbasin_affected_constraints.php',
+            data:{id:val},
+            type:'POST',
+            success:function(response){
+                $("#divProjectAffected").html(response);
+            },
+            error:function(xhr, status, error){
+                $("#divProjectAffected").html("ERROR: "+error);
+            }
+        });
 
       } else { // the return of the callback() is 'false'
         $("#divProjectError").html("**** Project ID not found ****");
@@ -720,11 +741,23 @@ $("#btnFindBUOWL").click(function(){
       lyrSearch = L.geoJSON(lyr.toGeoJSON(), {style:{color:'red', weight:10, opacity:0.5, fillOpacity:0}}).addTo(mymap);
       mymap.fitBounds(lyr.getBounds().pad(1));
       var att = lyr.feature.properties;
-      $("#divBUOWLData").html("<h4 class='text-center'>Attributes</h4><h5>Habitat: "+att.habitat+"</h5><h5>Historically Occupied: "+att.hist_occup+"</h5><h5>Recent Status: "+att.recentstatus+"</h5>");
+      $("#divBUOWLData").html("<h4 class='text-center'>Attributes</h4><h5><b>Habitat:</b> "+att.habitat+"</h5><h5><b>Historically Occupied:</b> "+att.hist_occup+"</h5><h5><b>Recent Status:</b> "+att.recentstatus+"</h5>");
       $("#divBUOWLError").html("");
 
-      fgpDrawnItems.clearLayers();
-      fgpDrawnItems.addLayer(lyr);
+      $.ajax({
+           url:'djbasin_affected_projects.php',
+           data:{tbl:'dj_buowl', distance:300, fld:'habitat_id', id:val},
+           type:'POST',
+           success:function(response){
+              console.log(response);
+               $("#divBUOWLaffected").html(response);
+           },
+           error:function(xhr, status, error){
+             console.log(error);
+               $("#divBUOWLaffected").html("ERROR: "+error);
+           }
+       });
+       $("#btnBUOWLsurveys").show();
     } else {
       $("#divBUOWLError").html("**** Habitat ID not found ****");
     }
@@ -852,7 +885,9 @@ function returnEagleMarker(json, latlng){
     var clrNest = 'chartreuse';
   }
   arEagleIDs.push(att.nest_id.toString());
-  return L.circle(latlng, {radius:804, color:clrNest,fillColor:'chartreuse', fillOpacity:0.5}).bindTooltip("<h4>Eagle Nest: "+att.nest_id+"</h4>Status: "+att.status);
+  return L.circle(latlng, {
+    radius:804, color:clrNest,fillColor:'chartreuse', fillOpacity:0.5
+  }).bindTooltip("<h4>Eagle Nest: "+att.nest_id+"</h4>Status: "+att.status);
 }
 
 //FILTER FUNCTION FOR EAGLE NESTS THROUGH CLIENT SIDE
@@ -872,26 +907,41 @@ $("#txtFindEagle").on('keyup paste', function(){
 });
 
 $("#btnFindEagle").click(function(){
-  var val = $("#txtFindEagle").val();
-  var lyr = returnLayerByAttribute("dj_eagle",'nest_id',val,
-  function(lyr){ //callback function
-    if (lyr) {
-      if (lyrSearch) {
-        lyrSearch.remove();
-      }
-      lyrSearch = L.circle(lyr.getLatLng(), {radius:800, color:'red', weight:10, opacity:0.5, fillOpacity:0}).addTo(mymap);
-      mymap.setView(lyr.getLatLng(), 14);
-      var att = lyr.feature.properties;
-      $("#divEagleData").html("<h4 class='text-center'>Attributes</h4><h5>Status: "+att.status+"</h5>");
-      $("#divEagleError").html("");
+     var val = $("#txtFindEagle").val();
+     returnLayerByAttribute("dj_eagle",'nest_id',val, function(lyr){
+         if (lyr) {
+             if (lyrSearch) {
+                 lyrSearch.remove();
+             }
+             lyrSearch = L.circle(lyr.getLatLng(), {radius:800, color:'red', weight:10, opacity:0.5, fillOpacity:0}).addTo(mymap);
+             mymap.setView(lyr.getLatLng(), 14);
+             var att = lyr.feature.properties;
+             $("#divEagleData").html("<h4 class='text-center'>Attributes</h4><h5>Status: "+att.status+"</h5>");
 
-      fgpDrawnItems.clearLayers();
-      fgpDrawnItems.addLayer(lyr);
-    } else {
-      $("#divEagleError").html("**** Eagle Nest ID not found ****");
-    }
-  });
-});
+             $.ajax({
+                 url:'djbasin_affected_projects.php',
+                 data:{tbl:'dj_eagle', distance:804, fld:'nest_id', id:val},
+                 type:'POST',
+                 success:function(response){
+                   console.log(response);
+                     $("#divEagleAffected").html(response);
+                 },
+                 error:function(xhr, status, error){
+                   console.log(error);
+                     $("#divEagleAffected").html("ERROR: "+error);
+                 }
+             });
+
+             $("#divEagleError").html("");
+
+             $("#btnEagleSurveys").show();
+
+
+          } else {
+             $("#divEagleError").html("**** Eagle Nest ID not found ****");
+         }
+     });
+ });
 
 $("#lblEagle").click(function(){
   $("#divEagleData").toggle();
@@ -1000,38 +1050,50 @@ $("#txtFindRaptor").on('keyup paste', function(){
 });
 
 $("#btnFindRaptor").click(function(){
-  var val = $("#txtFindRaptor").val();
-  var lyr = returnLayerByAttribute("dj_raptor",'nest_id',val,
-  function(lyr){ //callback function
-    if (lyr) {
-      if (lyrSearch) {
-        lyrSearch.remove();
-      }
-      var att = lyr.feature.properties;
-      switch (att.recentspecies) {
-        case 'Red-tail Hawk':
-        var radRaptor = 533;
-        break;
-        case 'Swainsons Hawk':
-        var radRaptor = 400;
-        break;
-        default:
-        var radRaptor = 804;
-        break;
-      }
-      lyrSearch = L.circle(lyr.getLatLng(), {radius:radRaptor, color:'red', weight:10, opacity:0.5, fillOpacity:0}).addTo(mymap);
-      mymap.setView(lyr.getLatLng(), 14);
-      $("#divRaptorData").html("<h4 class='text-center'>Attributes</h4><h5>Status: "+att.recentstatus+"</h5><h5>Species: "+att.recentspecies+"</h5><h5>Last Survey: "+att.lastsurvey+"</h5>");
-      $("#divRaptorError").html("");
+     var val = $("#txtFindRaptor").val();
+     returnLayerByAttribute("dj_raptor",'nest_id',val, function(lyr){
+         if (lyr) {
+             if (lyrSearch) {
+                 lyrSearch.remove();
+             }
+             var att = lyr.feature.properties;
+             switch (att.recentspecies) {
+                 case 'Red-tail Hawk':
+                     var radRaptor = 533;
+                     break;
+                 case 'Swainsons Hawk':
+                     var radRaptor = 400;
+                     break;
+                 default:
+                     var radRaptor = 804;
+                     break;
+             }
+             lyrSearch = L.circle(lyr.getLatLng(), {radius:radRaptor, color:'red', weight:10, opacity:0.5, fillOpacity:0}).addTo(mymap);
+             mymap.setView(lyr.getLatLng(), 14);
+             $("#divRaptorData").html("<h4 class='text-center'>Attributes</h4><h5>Status: "+att.recentstatus+"</h5><h5>Species: "+att.recentspecies+"</h5><h5>Last Survey: "+att.lastsurvey+"</h5>");
+             $("#divRaptorError").html("");
 
-      fgpDrawnItems.clearLayers();
-      fgpDrawnItems.addLayer(lyr);
+             $.ajax({
+                 url:'djbasin_affected_projects.php',
+                 data:{tbl:'dj_raptor', distance:radRaptor, fld:'nest_id', id:val},
+                 type:'POST',
+                 success:function(response){
+                   console.log(response);
+                     $("#divRaptorAffected").html(response);
+                 },
+                 error:function(xhr, status, error){
+                   console.log(error);
+                     $("#divRaptorAffected").html("ERROR: "+error);
+                 }
+             });
 
-    } else {
-      $("#divRaptorError").html("**** Raptor Nest ID not found ****");
-    }
-  });
-});
+             $("#btnRaptorSurveys").show();
+
+          } else {
+             $("#divRaptorError").html("**** Raptor Nest ID not found ****");
+         }
+     });
+ });
 
 $("#lblRaptor").click(function(){
   $("#divRaptorData").toggle();
@@ -1132,7 +1194,69 @@ function refreshGBH() {
 });
 }
 
-//************************  jQuery Event Handlers  ************
+//************************ jQuery Event Handlers  ************
+$("#btnRaptorSurveys").click(function(){
+    var search_id = $("#txtFindRaptor").val()
+    var whr="nest="+search_id
+    $.ajax({
+        url:'load_table.php',
+        data:{tbl:"dj_raptor_survey", title:'Surveys for Raptor Nest '+search_id, order:'date DESC', flds:'"user" AS "Surveyor", date AS "Survey Date", result AS "Result"', where:whr},
+        type:'POST',
+        success:function(response){
+            $("#tableData").html(response);
+            $("#dlgModal").show();
+        },
+        error:function(xhr, status, error){
+            $("#tableData").html("ERROR: "+error);
+            $("#dlgModal").show();
+        }
+    });
+})
+
+$("#btnBUOWLsurveys").click(function(){
+    var search_id = $("#txtFindBUOWL").val()
+    var whr="habitat="+search_id
+    $.ajax({
+        url:'load_table.php',
+        data:{tbl:"dj_buowl_survey", title:'Surveys for BUOWL Habitat '+search_id, order:'date DESC', flds:'surveyor AS "Surveyor", date AS "Survey Date", result AS "Result"', where:whr},
+        type:'POST',
+        success:function(response){
+            $("#tableData").html(response);
+            $("#dlgModal").show();
+        },
+        error:function(xhr, status, error){
+            $("#tableData").html("ERROR: "+error);
+            $("#dlgModal").show();
+        }
+    });
+})
+
+$("#btnEagleSurveys").click(function(){
+    var search_id = $("#txtFindEagle").val()
+    var whr="nest="+search_id
+    $.ajax({
+        url:'load_table.php',
+        data:{tbl:"dj_eagle_survey", title:'Surveys for Eagle Nest '+search_id, order:'date DESC', flds:'"user" AS "Surveyor", date AS "Survey Date", result AS "Result"', where:whr},
+        type:'POST',
+        success:function(response){
+            $("#tableData").html(response);
+            $("#dlgModal").show();
+        },
+        error:function(xhr, status, error){
+            $("#tableData").html("ERROR: "+error);
+            $("#dlgModal").show();
+        }
+    });
+})
+
+$("#btnCloseModal").click(function(){
+    $("#dlgModal").hide();
+})
+
+//Event handler if the grayed part of the modal is clicked
+// $("#dlgModal").click(function(){
+//   $("#dlgModal").hide();
+// });
 
 $("#btnGBH").click(function(){
   $("#lgndGBHDetail").toggle();
@@ -1163,15 +1287,6 @@ $("#btnTransparent").click(function(){
   }
 
 });
-
-$("#btnCloseModal").click(function(){
-  $("#dlgModal").hide();
-});
-
-//Event handler if the grayed part of the modal is clicked
-// $("#dlgModal").click(function(){
-//   $("#dlgModal").hide();
-// });
 
 //************************  General Functions *********
 
