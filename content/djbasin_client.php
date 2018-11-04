@@ -73,33 +73,35 @@ if (logged_in()) {
     background-color:darksalmon;
   }
 
-  .text-labels {
-    font-size:16px;
-    font-weight: bold;
-    color:red;
-    background: aqua;
-    text-align: center;
-    display: inline-block;
-    padding: 5pt;
-    border: 3px double darkred;
-    border-radius: 5pt;
-    margin-left: -15pt;
-    margin-top: -8pt;
-  }
+  .btnSurveys {
+       display:none;
+   }
 
-  .eagle-labels {
-    font-size:12px;
-    font-weight: bold;
-    color:white;
-    background: black;
-    text-align: center;
-    display: inline-block;
-    padding: 5pt;
-    border: 3px double red;
-    border-radius: 5pt;
-    margin-left: -20pt;
-    margin-top: -32pt;
-  }
+   /* The Modal (background) */
+   .modal {
+     /* This is what makes everything greyed out when the modal content is displayed */
+      /* Makes the modal on top of the sidebar */
+       z-index: 2001; /* Sit on top */
+       width: 100%; /* Full width */
+       height: 100%; /* Full height */
+       display: none; /* Hidden by default */
+       background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+   }
+
+   /* Modal Content */
+   .modal-content {
+       color: saddlebrown;
+       padding: 20px;
+       margin-top: 5%;
+       background-color:antiquewhite;
+       height:80%;
+       /* When the text displayed in the modal content is greater than 80% of the height it will add a scroll bar in the y position */
+       overflow-y:auto;
+   }
+
+   .tblHeader {
+       background-color: wheat
+   }
 
   </style>
 </head>
@@ -295,6 +297,18 @@ if (logged_in()) {
     </div>
   </div>
   <div id="mapdiv" class="col-md-12"></div>
+  <!-- The Modal -->
+ <div id="dlgModal" class="modal">
+      <!--col-sm-10: small screns it will cover almost the whole screen  and be offset by 1 col-sm-offset-1. It will be dysplayed from column 1 to 11 out of 12 columns-->
+      <!--col-md-7 : medium or big screns it will have the size of 7, and be offset by 4 col-md-offset-4. It will be dysplayed from column 4 (do not cover up the side bar) to 11 out of 12 columns-->
+       <div id="dlgContent" class="modal-content col-sm-10 col-sm-offset-1 col-md-7 col-md-offset-4">
+          <!-- pull-right is a bootstrap class that pull that dysplay the content of that element to the right side of the screen  -->
+          <!-- i element is an "font awesome" icon  -->
+           <span id="btnCloseModal" class="pull-right"><i class="fa fa-close fa-2x"></i></span>
+           <!-- This tableData DIV will be populated with the related information of a defined feature -->
+           <div id="tableData"></div>
+       </div>
+ </div>
   <script>
   var mymap;
   var lyrOSM;
@@ -364,8 +378,9 @@ if (logged_in()) {
     lyrWatercolor = L.tileLayer.provider('Stamen.Watercolor');
     mymap.addLayer(lyrOSM);
 
+    //read documentation for L.featureGroup(); and L.FeatureGroup();
     fgpDrawnItems = new L.FeatureGroup();
-    fgpDrawnItems.addTo(mymap);
+    //fgpDrawnItems.addTo(mymap); //It will be added later when a project is searched
 
     //************************  Load Data  ******
     refreshEagles();
@@ -388,6 +403,11 @@ if (logged_in()) {
     };
 
     ctlLayers = L.control.layers(objBasemaps, objOverlays).addTo(mymap);
+
+    mymap.on('click', function(){
+      //Makes the searched project (if any) doesn't be outstanding anymore
+      //alert( "Map clicked" );
+    });
 
     mymap.on('overlayadd', function(e){
       var strDiv = "#lgnd"+stripSpaces(e.name);
@@ -490,23 +510,25 @@ if (logged_in()) {
 
   $("#btnFindProject").click(function(){
     var val = $("#txtFindProject").val();
-    var lyr = returnLayerByAttribute(lyrClientLines,'project',val);
-    if (lyr) {
-      if (lyrSearch) {
-        lyrSearch.remove();
+    var lyr = returnLayerByAttribute("dj_linear",'project',val,
+    function(lyr){ //callback function
+      if (lyr) {
+        if (lyrSearch) {
+          lyrSearch.remove();
+        }
+        lyrSearch = L.geoJSON(lyr.toGeoJSON(), {style:{color:'red', weight:10, opacity:0.5}}).addTo(mymap);
+        mymap.fitBounds(lyr.getBounds().pad(1));
+        var att = lyr.feature.properties;
+        $("#divProjectData").html("<h4 class='text-center'>Attributes</h4><h5>Type: "+att.type+"</h5><h5>ROW width: "+att.row_width+ "m </h5>");
+        $("#divProjectError").html("");
+
+        fgpDrawnItems.clearLayers();
+        fgpDrawnItems.addLayer(lyr);
+
+      } else { // the return of the callback() is 'false'
+        $("#divProjectError").html("**** Project ID not found ****");
       }
-      lyrSearch = L.geoJSON(lyr.toGeoJSON(), {style:{color:'red', weight:10, opacity:0.5}}).addTo(mymap);
-      mymap.fitBounds(lyr.getBounds().pad(1));
-      var att = lyr.feature.properties;
-      $("#divProjectData").html("<h4 class='text-center'>Attributes</h4><h5>Type: "+att.type+"</h5><h5>ROW width: "+att.row_width+ "m </h5>");
-      $("#divProjectError").html("");
-
-      fgpDrawnItems.clearLayers();
-      fgpDrawnItems.addLayer(lyr);
-
-    } else {
-      $("#divProjectError").html("**** Project ID not found ****");
-    }
+    });
   });
 
   $("#lblProject").click(function(){
@@ -527,50 +549,50 @@ if (logged_in()) {
   });
 
   $("#btnProjectFilter").click(function(){
-       var arTypes=[];
-       var cntChecks=0;
-       $("input[name=fltProject]").each(function(){
-           if (this.checked) {
-               if (this.value=='Pipeline') {
-                   arTypes.push("'Pipeline'");
-                   cntChecks++;
-               }
-               if (this.value=='Flowline') {
-                   arTypes.push("'Flowline'");
-                   arTypes.push("'Flowline, est.'");
-                   cntChecks++;
-               }
-               if (this.value=='Electric') {
-                   arTypes.push("'Electric Line'");
-                   cntChecks++;
-               }
-               if (this.value=='Road') {
-                   arTypes.push("'Access Road - Confirmed'");
-                   arTypes.push("'Access Road - Estimated'");
-                   cntChecks++;
-               }
-               if (this.value=='Extraction') {
-                   arTypes.push("'Extraction'");
-                   arTypes.push("'Delayed-Extraction'");
-                   cntChecks++;
-               }
-               if (this.value=='Other') {
-                   arTypes.push("'Other'");
-                   arTypes.push("'Underground Pipe'");
-                   cntChecks++;
-               }
-           }
-       });
-       if (cntChecks==0) {
-           //the where clause receives "1=2", which is false and will return no values
-           refreshLinears("1=2");
-       } else if (cntChecks==6) {
-           refreshLinears();
-       } else {
-          alert("type IN ("+arTypes.toString()+")");
-           refreshLinears("type IN ("+arTypes.toString()+")");
-       }
-   });
+    var arTypes=[];
+    var cntChecks=0;
+    $("input[name=fltProject]").each(function(){
+      if (this.checked) {
+        if (this.value=='Pipeline') {
+          arTypes.push("'Pipeline'");
+          cntChecks++;
+        }
+        if (this.value=='Flowline') {
+          arTypes.push("'Flowline'");
+          arTypes.push("'Flowline, est.'");
+          cntChecks++;
+        }
+        if (this.value=='Electric') {
+          arTypes.push("'Electric Line'");
+          cntChecks++;
+        }
+        if (this.value=='Road') {
+          arTypes.push("'Access Road - Confirmed'");
+          arTypes.push("'Access Road - Estimated'");
+          cntChecks++;
+        }
+        if (this.value=='Extraction') {
+          arTypes.push("'Extraction'");
+          arTypes.push("'Delayed-Extraction'");
+          cntChecks++;
+        }
+        if (this.value=='Other') {
+          arTypes.push("'Other'");
+          arTypes.push("'Underground Pipe'");
+          cntChecks++;
+        }
+      }
+    });
+    if (cntChecks==0) {
+      //the where clause receives "1=2", which is false and will return no values
+      refreshLinears("1=2");
+    } else if (cntChecks==6) {
+      refreshLinears();
+    } else {
+      //alert("type IN ("+arTypes.toString()+")");
+      refreshLinears("type IN ("+arTypes.toString()+")");
+    }
+  });
 
   function refreshLinears(whr) {
     if(whr){
@@ -597,7 +619,6 @@ if (logged_in()) {
           lyrClientLines.remove();
           lyrClientLinesBuffer.remove();
         }
-        //buffers will be created in the processClientLinears()
         lyrClientLinesBuffer = L.featureGroup();
         lyrClientLines = L.geoJSON(jsnLinears, {style:styleClientLinears, onEachFeature:processClientLinears}).addTo(mymap);
 
@@ -624,33 +645,33 @@ if (logged_in()) {
 }
 
 function refreshLinearBuffers(whr) {
-    if (whr) {
-        var objData={tbl:'dj_linear', flds:"id, type, row_width, project", where:whr, distance:"row_width", limit:queryLimitNr}
+  if (whr) {
+    var objData={tbl:'dj_linear', flds:"id, type, row_width, project", where:whr, distance:"row_width", limit:queryLimitNr}
+  } else {
+    var objData={tbl:'dj_linear', flds:"id, type, row_width, project", distance:"row_width", limit:queryLimitNr}
+  }
+  $.ajax({url:'load_data.php',
+  data: objData,
+  type: 'POST',
+  success: function(response){
+    if (response.substring(0,5)=="ERROR"){
+      alert(response);
     } else {
-        var objData={tbl:'dj_linear', flds:"id, type, row_width, project", distance:"row_width", limit:queryLimitNr}
+      jsnLinearBuffers = JSON.parse(response);
+      console.log("refreshLinearBuffers Response:");
+      console.log(jsnLinearBuffers);
+      if (lyrClientLinesBuffer) {
+        lyrClientLinesBuffer.remove();
+      }
+      lyrClientLinesBuffer = L.geoJSON(jsnLinearBuffers, {style:{color:'grey', dashArray:'5,5', fillOpacity:0}}).addTo(mymap);
+      console.log("Buffer for lyrClientLines made on the server, using ST_Buffer!");
+      lyrClientLines.bringToFront();
     }
-    $.ajax({url:'load_data.php',
-        data: objData,
-        type: 'POST',
-        success: function(response){
-            if (response.substring(0,5)=="ERROR"){
-                alert(response);
-            } else {
-                jsnLinearBuffers = JSON.parse(response);
-                console.log("refreshLinearBuffers Response:");
-                console.log(jsnLinearBuffers);
-                if (lyrClientLinesBuffer) {
-                    lyrClientLinesBuffer.remove();
-                }
-                lyrClientLinesBuffer = L.geoJSON(jsnLinearBuffers, {style:{color:'grey', dashArray:'5,5', fillOpacity:0}}).addTo(mymap);
-                console.log("Buffer for lyrClientLines made on the server, using ST_Buffer!");
-                lyrClientLines.bringToFront();
-            }
-        },
-        error: function(xhr, status, error){
-         alert("ERROR: "+error);
-        }
-    });
+  },
+  error: function(xhr, status, error){
+    alert("ERROR: "+error);
+  }
+});
 }
 
 //************************ BUOWL Functions
@@ -689,27 +710,26 @@ $("#txtFindBUOWL").on('keyup paste', function(){
 
 $("#btnFindBUOWL").click(function(){
   //##FUNCTION That's called when the #btnFindBUOWL is clicked
-
   var val = $("#txtFindBUOWL").val();
-  var lyr = returnLayerByAttribute(lyrBUOWL,'habitat_id',val);
-  if (lyr) {
-    if (lyrSearch) {
-      lyrSearch.remove();
+  var lyr = returnLayerByAttribute("dj_buowl",'habitat_id',val,
+  function(lyr){ //callback function
+    if (lyr) {
+      if (lyrSearch) {
+        lyrSearch.remove();
+      }
+      lyrSearch = L.geoJSON(lyr.toGeoJSON(), {style:{color:'red', weight:10, opacity:0.5, fillOpacity:0}}).addTo(mymap);
+      mymap.fitBounds(lyr.getBounds().pad(1));
+      var att = lyr.feature.properties;
+      $("#divBUOWLData").html("<h4 class='text-center'>Attributes</h4><h5>Habitat: "+att.habitat+"</h5><h5>Historically Occupied: "+att.hist_occup+"</h5><h5>Recent Status: "+att.recentstatus+"</h5>");
+      $("#divBUOWLError").html("");
+
+      fgpDrawnItems.clearLayers();
+      fgpDrawnItems.addLayer(lyr);
+    } else {
+      $("#divBUOWLError").html("**** Habitat ID not found ****");
     }
-    lyrSearch = L.geoJSON(lyr.toGeoJSON(), {style:{color:'red', weight:10, opacity:0.5, fillOpacity:0}}).addTo(mymap);
-    mymap.fitBounds(lyr.getBounds().pad(1));
-    var att = lyr.feature.properties;
-    $("#divBUOWLData").html("<h4 class='text-center'>Attributes</h4><h5>Habitat: "+att.habitat+"</h5><h5>Historically Occupied: "+att.hist_occup+"</h5><h5>Recent Status: "+att.recentstatus+"</h5>");
-    $("#divBUOWLError").html("");
-
-    fgpDrawnItems.clearLayers();
-    fgpDrawnItems.addLayer(lyr);
-
-  } else {
-    $("#divBUOWLError").html("**** Habitat ID not found ****");
-  }
+  });
 });
-
 $("#lblBUOWL").click(function(){
   $("#divBUOWLData").toggle();
 });
@@ -739,38 +759,38 @@ function refreshBUOWL(whr) {
       alert(response);
     }else {
       //Array that will be processed in the processBUOWL() and will have the Unique IDs for the existing features
-        arHabitatIDs=[];
-        //Once the response is a JSON. Use JSON.parse() to format in the right way
-        jsnBUOWL = JSON.parse(response);
-        console.log("refreshBUOWL Response:");
-        console.log(jsnBUOWL);
-        if (lyrBUOWL) {
-          ctlLayers.removeLayer(lyrBUOWL);
-          lyrBUOWL.remove();
-          lyrBUOWLbuffer.remove();
-        }
-        //Create the BUOWL layer and add tto the map
-        lyrBUOWL = L.geoJSON(jsnBUOWL, {style:styleBUOWL, onEachFeature:processBUOWL}).addTo(mymap);
-
-        //Adds the Layer to the control Layer panel, specifying its name
-        //If the name specified here is changed. It also should be changed the name of the legend div
-        ctlLayers.addOverlay(lyrBUOWL, "Burrowing Owl Habitat");
-
-        //Sort the array, that was filled out in the processBUOWL(), with unique IDs in a crescent order
-        //The arrays contain the IDs in a text format. The below code is WKformat in JS to sort in a crescent order
-        arHabitatIDs.sort(function(a,b){return a-b});
-        //Completing the input text for the user with the ID of the existing projects
-        $("#txtFindBUOWL").autocomplete({
-          source:arHabitatIDs
-        });
-
-        //Create the buffer for this layer, in the server side and add it to the map
-        //Pass the same 'where' clause to the buffer in order to filter it
-        refreshBUOWLbuffer(whr);
-
-        //Bring the BUOWL layer to front in order to the Popup to work
-        lyrBUOWL.bringToFront();
+      arHabitatIDs=[];
+      //Once the response is a JSON. Use JSON.parse() to format in the right way
+      jsnBUOWL = JSON.parse(response);
+      console.log("refreshBUOWL Response:");
+      console.log(jsnBUOWL);
+      if (lyrBUOWL) {
+        ctlLayers.removeLayer(lyrBUOWL);
+        lyrBUOWL.remove();
+        lyrBUOWLbuffer.remove();
       }
+      //Create the BUOWL layer and add tto the map
+      lyrBUOWL = L.geoJSON(jsnBUOWL, {style:styleBUOWL, onEachFeature:processBUOWL}).addTo(mymap);
+
+      //Adds the Layer to the control Layer panel, specifying its name
+      //If the name specified here is changed. It also should be changed the name of the legend div
+      ctlLayers.addOverlay(lyrBUOWL, "Burrowing Owl Habitat");
+
+      //Sort the array, that was filled out in the processBUOWL(), with unique IDs in a crescent order
+      //The arrays contain the IDs in a text format. The below code is WKformat in JS to sort in a crescent order
+      arHabitatIDs.sort(function(a,b){return a-b});
+      //Completing the input text for the user with the ID of the existing projects
+      $("#txtFindBUOWL").autocomplete({
+        source:arHabitatIDs
+      });
+
+      //Create the buffer for this layer, in the server side and add it to the map
+      //Pass the same 'where' clause to the buffer in order to filter it
+      refreshBUOWLbuffer(whr);
+
+      //Bring the BUOWL layer to front in order to the Popup to work
+      lyrBUOWL.bringToFront();
+    }
   },
   error: function(xhr, status, error){
     alert("ERROR: "+error);
@@ -792,20 +812,20 @@ function refreshBUOWLbuffer(whr) {
     if (response.substring(0,5)=="ERROR"){
       alert(response);
     }else {
-        //Once the response is a JSON. Use JSON.parse() to format in the right way
-        jsnBUOWLbuffer = JSON.parse(response);
-        console.log("refreshBUOWLBuffer Response:");
-        console.log(jsnBUOWLbuffer);
-        if (lyrBUOWLbuffer) {
-          lyrBUOWLbuffer.remove();
-        }
-        //Create the BUOWL buffer layer and add to the map
-        lyrBUOWLbuffer = L.geoJSON(jsnBUOWLbuffer, {style:{color:'yellow', dashArray:'5,5', fillOpacity:0}}).addTo(mymap);
-        console.log("Buffer for lyrBUOWL made on the server, using ST_Buffer!");
-
-        //Bring the BUOWL layer to front in order to the Popup to work
-        lyrBUOWL.bringToFront();
+      //Once the response is a JSON. Use JSON.parse() to format in the right way
+      jsnBUOWLbuffer = JSON.parse(response);
+      console.log("refreshBUOWLBuffer Response:");
+      console.log(jsnBUOWLbuffer);
+      if (lyrBUOWLbuffer) {
+        lyrBUOWLbuffer.remove();
       }
+      //Create the BUOWL buffer layer and add to the map
+      lyrBUOWLbuffer = L.geoJSON(jsnBUOWLbuffer, {style:{color:'yellow', dashArray:'5,5', fillOpacity:0}}).addTo(mymap);
+      console.log("Buffer for lyrBUOWL made on the server, using ST_Buffer!");
+
+      //Bring the BUOWL layer to front in order to the Popup to work
+      lyrBUOWL.bringToFront();
+    }
   },
   error: function(xhr, status, error){
     alert("ERROR: "+error);
@@ -853,23 +873,24 @@ $("#txtFindEagle").on('keyup paste', function(){
 
 $("#btnFindEagle").click(function(){
   var val = $("#txtFindEagle").val();
-  var lyr = returnLayerByAttribute(lyrEagleNests,'nest_id',val);
-  if (lyr) {
-    if (lyrSearch) {
-      lyrSearch.remove();
+  var lyr = returnLayerByAttribute("dj_eagle",'nest_id',val,
+  function(lyr){ //callback function
+    if (lyr) {
+      if (lyrSearch) {
+        lyrSearch.remove();
+      }
+      lyrSearch = L.circle(lyr.getLatLng(), {radius:800, color:'red', weight:10, opacity:0.5, fillOpacity:0}).addTo(mymap);
+      mymap.setView(lyr.getLatLng(), 14);
+      var att = lyr.feature.properties;
+      $("#divEagleData").html("<h4 class='text-center'>Attributes</h4><h5>Status: "+att.status+"</h5>");
+      $("#divEagleError").html("");
+
+      fgpDrawnItems.clearLayers();
+      fgpDrawnItems.addLayer(lyr);
+    } else {
+      $("#divEagleError").html("**** Eagle Nest ID not found ****");
     }
-    lyrSearch = L.circle(lyr.getLatLng(), {radius:800, color:'red', weight:10, opacity:0.5, fillOpacity:0}).addTo(mymap);
-    mymap.setView(lyr.getLatLng(), 14);
-    var att = lyr.feature.properties;
-    $("#divEagleData").html("<h4 class='text-center'>Attributes</h4><h5>Status: "+att.status+"</h5>");
-    $("#divEagleError").html("");
-
-    fgpDrawnItems.clearLayers();
-    fgpDrawnItems.addLayer(lyr);
-
-  } else {
-    $("#divEagleError").html("**** Eagle Nest ID not found ****");
-  }
+  });
 });
 
 $("#lblEagle").click(function(){
@@ -888,49 +909,49 @@ $("input[name=fltEagle]").click(function(){
 
 function refreshEagles(whr) {
   if(whr){ //The data will be filter using 'where' clause
-    var objData = {tbl:'dj_eagle', flds:"id, status, nest_id", where:whr, limit:queryLimitNr};
-  }else{
-    var objData = {tbl:'dj_eagle', flds:"id, status, nest_id", limit:queryLimitNr};
-  }
-  $.ajax({url:'load_data.php',
-  data: objData,
-  type: 'POST',
-  success: function(response){
-    //catching the ERROR (if any)
-    if (response.substring(0,5)=="ERROR"){
-      alert(response);
-    }else {
-      //Array that will be filled out in the returnEagleMarker() and will have the Unique IDs for the existing features
-      arEagleIDs=[];
-      //Once the response is a JSON. Use JSON.parse() to format in the right way
-      jsnEagles = JSON.parse(response);
-      console.log("refreshEagles Response:");
-      console.log(jsnEagles);
-      if (lyrEagleNests) {
-        ctlLayers.removeLayer(lyrEagleNests);
-        lyrEagleNests.remove();
-      }
-      //Create the BUOWL layer and add tto the map
-      lyrEagleNests = L.geoJSON(jsnEagles, {pointToLayer:returnEagleMarker
-        //, filter:filterEagle //Filter Function through the client side
-      }).addTo(mymap);
-
-      //Adds the Layer to the control Layer panel, specifying its name
-      //If the name specified here is changed. It also should be changed the name of the legend div
-      ctlLayers.addOverlay(lyrEagleNests, "Eagle Nests");
-
-      //Sort the array, that was filled out in the returnEagleMarker(), with unique IDs in a crescent order
-       //The arrays contain the IDs in a text format. The below code is WKformat in JS to sort in a crescent order
-      arEagleIDs.sort(function(a,b){return a-b});
-      //Completing the input text for the user with the ID of the existing projects
-      $("#txtFindEagle").autocomplete({
-        source:arEagleIDs
-      });
+  var objData = {tbl:'dj_eagle', flds:"id, status, nest_id", where:whr, limit:queryLimitNr};
+}else{
+  var objData = {tbl:'dj_eagle', flds:"id, status, nest_id", limit:queryLimitNr};
+}
+$.ajax({url:'load_data.php',
+data: objData,
+type: 'POST',
+success: function(response){
+  //catching the ERROR (if any)
+  if (response.substring(0,5)=="ERROR"){
+    alert(response);
+  }else {
+    //Array that will be filled out in the returnEagleMarker() and will have the Unique IDs for the existing features
+    arEagleIDs=[];
+    //Once the response is a JSON. Use JSON.parse() to format in the right way
+    jsnEagles = JSON.parse(response);
+    console.log("refreshEagles Response:");
+    console.log(jsnEagles);
+    if (lyrEagleNests) {
+      ctlLayers.removeLayer(lyrEagleNests);
+      lyrEagleNests.remove();
     }
-  },
-  error: function(xhr, status, error){
-    alert("ERROR: "+error);
+    //Create the BUOWL layer and add tto the map
+    lyrEagleNests = L.geoJSON(jsnEagles, {pointToLayer:returnEagleMarker
+      //, filter:filterEagle //Filter Function through the client side
+    }).addTo(mymap);
+
+    //Adds the Layer to the control Layer panel, specifying its name
+    //If the name specified here is changed. It also should be changed the name of the legend div
+    ctlLayers.addOverlay(lyrEagleNests, "Eagle Nests");
+
+    //Sort the array, that was filled out in the returnEagleMarker(), with unique IDs in a crescent order
+    //The arrays contain the IDs in a text format. The below code is WKformat in JS to sort in a crescent order
+    arEagleIDs.sort(function(a,b){return a-b});
+    //Completing the input text for the user with the ID of the existing projects
+    $("#txtFindEagle").autocomplete({
+      source:arEagleIDs
+    });
   }
+},
+error: function(xhr, status, error){
+  alert("ERROR: "+error);
+}
 });
 }
 
@@ -980,34 +1001,36 @@ $("#txtFindRaptor").on('keyup paste', function(){
 
 $("#btnFindRaptor").click(function(){
   var val = $("#txtFindRaptor").val();
-  var lyr = returnLayerByAttribute(lyrRaptorNests,'nest_id',val);
-  if (lyr) {
-    if (lyrSearch) {
-      lyrSearch.remove();
-    }
-    var att = lyr.feature.properties;
-    switch (att.recentspecies) {
-      case 'Red-tail Hawk':
-      var radRaptor = 533;
-      break;
-      case 'Swainsons Hawk':
-      var radRaptor = 400;
-      break;
-      default:
-      var radRaptor = 804;
-      break;
-    }
-    lyrSearch = L.circle(lyr.getLatLng(), {radius:radRaptor, color:'red', weight:10, opacity:0.5, fillOpacity:0}).addTo(mymap);
-    mymap.setView(lyr.getLatLng(), 14);
-    $("#divRaptorData").html("<h4 class='text-center'>Attributes</h4><h5>Status: "+att.recentstatus+"</h5><h5>Species: "+att.recentspecies+"</h5><h5>Last Survey: "+att.lastsurvey+"</h5>");
-    $("#divRaptorError").html("");
+  var lyr = returnLayerByAttribute("dj_raptor",'nest_id',val,
+  function(lyr){ //callback function
+    if (lyr) {
+      if (lyrSearch) {
+        lyrSearch.remove();
+      }
+      var att = lyr.feature.properties;
+      switch (att.recentspecies) {
+        case 'Red-tail Hawk':
+        var radRaptor = 533;
+        break;
+        case 'Swainsons Hawk':
+        var radRaptor = 400;
+        break;
+        default:
+        var radRaptor = 804;
+        break;
+      }
+      lyrSearch = L.circle(lyr.getLatLng(), {radius:radRaptor, color:'red', weight:10, opacity:0.5, fillOpacity:0}).addTo(mymap);
+      mymap.setView(lyr.getLatLng(), 14);
+      $("#divRaptorData").html("<h4 class='text-center'>Attributes</h4><h5>Status: "+att.recentstatus+"</h5><h5>Species: "+att.recentspecies+"</h5><h5>Last Survey: "+att.lastsurvey+"</h5>");
+      $("#divRaptorError").html("");
 
-    fgpDrawnItems.clearLayers();
-    fgpDrawnItems.addLayer(lyr);
+      fgpDrawnItems.clearLayers();
+      fgpDrawnItems.addLayer(lyr);
 
-  } else {
-    $("#divRaptorError").html("**** Raptor Nest ID not found ****");
-  }
+    } else {
+      $("#divRaptorError").html("**** Raptor Nest ID not found ****");
+    }
+  });
 });
 
 $("#lblRaptor").click(function(){
@@ -1027,9 +1050,9 @@ $("input[name=fltRaptor]").click(function(){
 function refreshRaptors(whr) {
   if(whr){
     var objData = { tbl:'dj_raptor',
-                    flds:"id, nest_id, recentstatus, recentspecies, lastsurvey",
-                    where:whr,
-                    limit:queryLimitNr};
+    flds:"id, nest_id, recentstatus, recentspecies, lastsurvey",
+    where:whr,
+    limit:queryLimitNr};
   }else {
     var objData = {tbl:'dj_raptor', flds:"id, nest_id, recentstatus, recentspecies, lastsurvey", limit:queryLimitNr};
   }
@@ -1141,21 +1164,57 @@ $("#btnTransparent").click(function(){
 
 });
 
+$("#btnCloseModal").click(function(){
+  $("#dlgModal").hide();
+});
+
+//Event handler if the grayed part of the modal is clicked
+// $("#dlgModal").click(function(){
+//   $("#dlgModal").hide();
+// });
+
 //************************  General Functions *********
 
 function LatLngToArrayString(ll) {
   return "["+ll.lat.toFixed(5)+", "+ll.lng.toFixed(5)+"]";
 }
 
-function returnLayerByAttribute(lyr,att,val) {
-  var arLayers = lyr.getLayers();
-  for (i=0;i<arLayers.length-1;i++) {
-    var ftrVal = arLayers[i].feature.properties[att];
-    if (ftrVal==val) {
-      return arLayers[i];
+function returnLayerByAttribute(tbl,fld,val,callback) {
+  //The value should be in single quotes. DOuble quotes are interpreted as fields.
+  //If it's a number, postgreSQL converts automatically to number if needed
+  var whr=fld+"='"+val+"'";
+  $.ajax({
+    url:'load_data.php',
+    data: {tbl:tbl, where:whr},
+    type: 'POST',
+    success: function(response){
+      if (response.substr(0,5)=="ERROR") {
+        //Catching an ERROR if any with the message from the Server
+        alert(response);
+        callback(false);
+      } else {
+        var jsn= JSON.parse(response);
+        //Get all the response of the query and adds all the features to a Layer group
+        var lyrGroup = L.geoJSON(jsn);
+        console.log("lyrGroup of the searched obj:");
+        console.log(lyrGroup);
+        //get the individual features in an array
+        var arLyrs=lyrGroup.getLayers();
+        console.log(arLyrs);
+        //Check if at least one obj was found
+        if (arLyrs.length>0) {
+          //retuns the first element that correspond to our query. It shouldn't return more than one element
+          callback(arLyrs[0]);
+        } else {
+          callback(false);
+        }
+      }
+    },
+    error: function(xhr, status, error) {
+      alert("ERROR: "+error);
+      callback(false);
     }
-  }
-  return false;
+  });
 }
 
 function returnLayersByAttribute(lyr,att,val) {
