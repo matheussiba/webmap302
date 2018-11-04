@@ -332,7 +332,7 @@ if (logged_in()) {
   var arRaptorIDs = [];
 
   //limit query FOR TEST PURPOSE to speed up the loading process on the canvas
-  var queryLimitNr=100;
+  var queryLimitNr=2000;
 
   $(document).ready(function(){
 
@@ -649,20 +649,6 @@ function processBUOWL(json, lyr){
   arHabitatIDs.push(att.habitat_id.toString())
 }
 
-function filterBUOWL(json){
-  var att = json.properties;
-  if (att.recentstatus=='REMOVED') {
-    return false;
-  } else {
-    var optFilter = $("input[name=fltBUOWL]:checked").val();
-    if (optFilter=='ALL') {
-      return true;
-    } else {
-      return (att.hist_occup==optFilter);
-    }
-  }
-}
-
 $("#txtFindBUOWL").on('keyup paste', function(){
   var val = $("#txtFindBUOWL").val();
   testLayerAttribute(arHabitatIDs, val, "Habitat ID", "#divFindBUOWL", "#divBUOWLError", "#btnFindBUOWL");
@@ -696,13 +682,23 @@ $("#lblBUOWL").click(function(){
 });
 
 $("input[name=fltBUOWL]").click(function(){
-  refreshBUOWL();
+  var optFilter = $("input[name=fltBUOWL]:checked").val();
+  if (optFilter=='ALL') {
+    refreshBUOWL();
+  } else {
+    refreshBUOWL("hist_occup='"+optFilter+"'");
+  }
 });
 
 
-function refreshBUOWL() {
+function refreshBUOWL(whr) {
+  if(whr){
+    var objData = {tbl:'dj_buowl', flds:"id, habitat_id, habitat, recentstatus, hist_occup", where:whr, limit:queryLimitNr};
+  }else{
+    var objData = {tbl:'dj_buowl', flds:"id, habitat_id, habitat, recentstatus, hist_occup",limit:queryLimitNr};
+  }
   $.ajax({url:'load_data.php',
-  data: {tbl:'dj_buowl', flds:"id, habitat_id, habitat, recentstatus, hist_occup",limit:queryLimitNr},
+  data: objData,
   type: 'POST',
   success: function(response){
     //catching the ERROR (if any)
@@ -721,7 +717,7 @@ function refreshBUOWL() {
           lyrBUOWLbuffer.remove();
         }
         //Create the BUOWL layer and add tto the map
-        lyrBUOWL = L.geoJSON(jsnBUOWL, {style:styleBUOWL, onEachFeature:processBUOWL, filter:filterBUOWL}).addTo(mymap);
+        lyrBUOWL = L.geoJSON(jsnBUOWL, {style:styleBUOWL, onEachFeature:processBUOWL}).addTo(mymap);
 
         //Adds the Layer to the control Layer panel, specifying its name
         //If the name specified here is changed. It also should be changed the name of the legend div
@@ -735,9 +731,9 @@ function refreshBUOWL() {
           source:arHabitatIDs
         });
 
-        //Create the buffer for this layer and add it to the map
-        //From the server
-        refreshBUOWLbuffer();
+        //Create the buffer for this layer, in the server side and add it to the map
+        //Pass the same 'where' clause to the buffer in order to filter it
+        refreshBUOWLbuffer(whr);
         //From turf.js
         // jsnBUOWLbuffer = turf.buffer(lyrBUOWL.toGeoJSON(), 0.3, {units:'kilometers'});
         // lyrBUOWLbuffer = L.geoJSON(jsnBUOWLbuffer, {style:{color:'yellow', dashArray:'5,5', fillOpacity:0}}).addTo(mymap);
@@ -752,11 +748,16 @@ function refreshBUOWL() {
 });
 }
 
-function refreshBUOWLbuffer() {
+function refreshBUOWLbuffer(whr) {
+  if(whr){
+    var objData = {tbl:'dj_buowl', flds:"id, habitat_id, habitat, recentstatus, hist_occup", distance:300, where:whr, limit:queryLimitNr};
+  }else{
+    var objData = {tbl:'dj_buowl', flds:"id, habitat_id, habitat, recentstatus, hist_occup", distance:300, limit:queryLimitNr};
+  }
   //The BUFFER for this layer is made on the server. As an example the buffer for the Linears Project is made on the client, using turf.js.
   //It was not tested on the web, to check each one is faster. That's why there's both layers using different methods to be tested.
   $.ajax({url:'load_data.php',
-  data: {tbl:'dj_buowl', flds:"id, habitat_id, habitat, recentstatus, hist_occup", distance:300, limit:queryLimitNr},
+  data: objData,
   type: 'POST',
   success: function(response){
     //catching the ERROR (if any)
@@ -771,7 +772,7 @@ function refreshBUOWLbuffer() {
           lyrBUOWLbuffer.remove();
         }
         //Create the BUOWL buffer layer and add to the map
-        lyrBUOWLbuffer = L.geoJSON(jsnBUOWLbuffer, {style:{color:'yellow', dashArray:'5,5', fillOpacity:0}, filter:filterBUOWL}).addTo(mymap);
+        lyrBUOWLbuffer = L.geoJSON(jsnBUOWLbuffer, {style:{color:'yellow', dashArray:'5,5', fillOpacity:0}}).addTo(mymap);
         console.log("Buffer for lyrBUOWL made on the server, using ST_Buffer!");
 
         //Bring the BUOWL layer to front in order to the Popup to work
@@ -806,15 +807,16 @@ function returnEagleMarker(json, latlng){
   return L.circle(latlng, {radius:804, color:clrNest,fillColor:'chartreuse', fillOpacity:0.5}).bindTooltip("<h4>Eagle Nest: "+att.nest_id+"</h4>Status: "+att.status);
 }
 
-function filterEagle(json) {
-  var att=json.properties;
-  var optFilter = $("input[name=fltEagle]:checked").val();
-  if (optFilter=='ALL') {
-    return true;
-  } else {
-    return (att.status==optFilter);
-  }
-}
+//FILTER FUNCTION FOR EAGLE NESTS THROUGH CLIENT SIDE
+// function filterEagle(json) {
+//   var att=json.properties;
+//   var optFilter = $("input[name=fltEagle]:checked").val();
+//   if (optFilter=='ALL') {
+//     return true;
+//   } else {
+//     return (att.status==optFilter);
+//   }
+// }
 
 $("#txtFindEagle").on('keyup paste', function(){
   var val = $("#txtFindEagle").val();
@@ -847,12 +849,23 @@ $("#lblEagle").click(function(){
 });
 
 $("input[name=fltEagle]").click(function(){
-  refreshEagles();
+  //Filtering Eagle Nests. It will be mande on the server side.
+  var optFilter = $("input[name=fltEagle]:checked").val();
+  if(optFilter=="ALL"){
+    refreshEagles();
+  }else{
+    refreshEagles("status='"+optFilter+"'");
+  }
 });
 
-function refreshEagles() {
+function refreshEagles(whr) {
+  if(whr){ //The data will be filter using 'where' clause
+    var objData = {tbl:'dj_eagle', flds:"id, status, nest_id", where:whr, limit:queryLimitNr};
+  }else{
+    var objData = {tbl:'dj_eagle', flds:"id, status, nest_id", limit:queryLimitNr};
+  }
   $.ajax({url:'load_data.php',
-  data: {tbl:'dj_eagle', flds:"id, status, nest_id", limit:queryLimitNr},
+  data: objData,
   type: 'POST',
   success: function(response){
     //catching the ERROR (if any)
@@ -870,7 +883,9 @@ function refreshEagles() {
         lyrEagleNests.remove();
       }
       //Create the BUOWL layer and add tto the map
-      lyrEagleNests = L.geoJSON(jsnEagles, {pointToLayer:returnEagleMarker, filter:filterEagle}).addTo(mymap);
+      lyrEagleNests = L.geoJSON(jsnEagles, {pointToLayer:returnEagleMarker
+        //, filter:filterEagle //Filter Function through the client side
+      }).addTo(mymap);
 
       //Adds the Layer to the control Layer panel, specifying its name
       //If the name specified here is changed. It also should be changed the name of the legend div
@@ -930,16 +945,6 @@ function returnRaptorMarker(json, latlng){
   return L.circle(latlng, optRaptor).bindPopup("<h4>Raptor Nest: "+att.nest_id+"</h4>Status: "+att.recentstatus+"<br>Species: "+att.recentspecies+"<br>Last Survey: "+att.lastsurvey);
 }
 
-function filterRaptor(json) {
-  var att=json.properties;
-  var optFilter = $("input[name=fltRaptor]:checked").val();
-  if (optFilter=='ALL') {
-    return true;
-  } else {
-    return (att.recentstatus==optFilter);
-  }
-}
-
 $("#txtFindRaptor").on('keyup paste', function(){
   var val = $("#txtFindRaptor").val();
   testLayerAttribute(arRaptorIDs, val, "Raptor Nest ID", "#divFindRaptor", "#divRaptorError", "#btnFindRaptor");
@@ -982,12 +987,26 @@ $("#lblRaptor").click(function(){
 });
 
 $("input[name=fltRaptor]").click(function(){
-  refreshRaptors();
+  //Filtering Eagle Nests. It will be mande on the server side.
+  var optFilter = $("input[name=fltRaptor]:checked").val();
+  if(optFilter=="ALL"){
+    refreshRaptors();
+  }else{
+    refreshRaptors("recentstatus='"+optFilter+"'");
+  }
 });
 
-function refreshRaptors() {
+function refreshRaptors(whr) {
+  if(whr){
+    var objData = { tbl:'dj_raptor',
+                    flds:"id, nest_id, recentstatus, recentspecies, lastsurvey",
+                    where:whr,
+                    limit:queryLimitNr};
+  }else {
+    var objData = {tbl:'dj_raptor', flds:"id, nest_id, recentstatus, recentspecies, lastsurvey", limit:queryLimitNr};
+  }
   $.ajax({url:'load_data.php',
-  data: {tbl:'dj_raptor', flds:"id, nest_id, recentstatus, recentspecies, lastsurvey", limit: queryLimitNr},
+  data: objData,
   type: 'POST',
   success: function(response){
     //catching the ERROR (if any)
@@ -1005,7 +1024,7 @@ function refreshRaptors() {
         lyrRaptorNests.remove();
       }
       //The layer won't be added to the map, because it'll be added by the Masker CLuster.
-      lyrRaptorNests = L.geoJSON(jsnRaptors, {pointToLayer:returnRaptorMarker, filter:filterRaptor});
+      lyrRaptorNests = L.geoJSON(jsnRaptors, {pointToLayer:returnRaptorMarker});
 
       //Sort the array, that was filled out in the returnRaptorMarker(), with unique IDs in a crescent order
       //The arrays contain the IDs in a text format. The below code is WKformat in JS to sort in a crescent order
